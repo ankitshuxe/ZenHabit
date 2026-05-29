@@ -1,97 +1,86 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import * as Icons from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Title, Caption } from './Typography';
+import { IconMap } from './IconMap';
 
-export default function HabitCard({ habit, theme, dateStr, onToggle }) {
-  const IconComponent = Icons[habit.icon] || Icons.Activity;
+function HabitCard({ habit, theme, dateStr, onToggle, onLongPress }) {
   const current = habit.completions[dateStr] || 0;
-  
-  let isCompleted = false;
-  let statusText = '';
-  
-  if (habit.type === 'checkoff') {
-    isCompleted = current > 0;
-    statusText = isCompleted ? 'Completed today' : 'Pending';
-  } else {
-    isCompleted = current >= habit.target;
-    statusText = `${current}/${habit.target} ${habit.unit}`;
-  }
-
-  // Calculate streak
-  // A simple implementation: just counting total completions across all days for now
-  const totalDays = Object.values(habit.completions).reduce((sum, val) => {
-    if (habit.type === 'checkoff') return sum + (val > 0 ? 1 : 0);
-    return sum + (val >= habit.target ? 1 : 0);
-  }, 0);
+  const isCompleted = current > 0;
+  const streak = habit.currentStreak || 0;
+  const isBreak = habit.goalType === 'break';
+  const IconComp = IconMap[habit.icon] || IconMap['Activity'];
 
   return (
     <TouchableOpacity 
-      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} 
-      onPress={onToggle}
+      style={[
+        styles.card, 
+        { borderBottomColor: theme.border },
+        isBreak && !isCompleted && { backgroundColor: theme.danger + '08' } // very subtle red tint for break habits
+      ]} 
       activeOpacity={0.7}
+      onLongPress={() => onLongPress(habit.id)}
+      onPress={() => onToggle(habit.id)}
     >
-      <View style={[styles.iconContainer, { backgroundColor: habit.color + '20' }]}>
-        <IconComponent color={habit.color} size={24} />
-      </View>
-      
-      <View style={styles.contentContainer}>
-        <Text style={[styles.name, { color: theme.text }]}>{habit.name}</Text>
-        <Text style={[styles.status, { color: theme.textSecondary }]}>
-          {statusText} • Total Days: {totalDays}
-        </Text>
+      <View style={styles.leftGroup}>
+        <View style={styles.titleRow}>
+          <IconComp color={isBreak ? theme.danger : theme.text} size={18} style={{ marginRight: 10, opacity: isCompleted ? 0.5 : 1 }} strokeWidth={2.5} />
+          <Title style={[styles.name, { color: isBreak ? theme.danger : theme.text, opacity: isCompleted ? 0.5 : 1, textDecorationLine: isCompleted ? 'line-through' : 'none' }]}>
+            {habit.name}
+          </Title>
+        </View>
+        <Caption style={{ color: theme.textSecondary, marginLeft: 28 }}>
+          STREAK • {streak} {streak === 1 ? 'DAY' : 'DAYS'}
+        </Caption>
       </View>
 
-      <View style={[
-        styles.checkbox, 
-        { borderColor: theme.border },
-        isCompleted && { backgroundColor: habit.color, borderColor: habit.color }
-      ]}>
-        {isCompleted && <Icons.Check color="#FFF" size={16} />}
+      <View style={styles.rightGroup}>
+        {isCompleted ? (
+          <View style={[styles.badge, { backgroundColor: isBreak ? theme.danger : theme.accent }]}>
+            <Caption style={styles.badgeText}>{isBreak ? 'RESISTED' : 'DONE'}</Caption>
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
 }
 
+export default React.memo(HabitCard);
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    paddingHorizontal: 8,
+    marginHorizontal: -8, // compensate for padding to keep alignment
+    borderRadius: 8,
   },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  leftGroup: {
+    flexDirection: 'column',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
   },
-  contentContainer: {
-    flex: 1,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   name: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '800',
   },
-  status: {
-    fontSize: 13,
-  },
-  checkbox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    justifyContent: 'center',
+  rightGroup: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   }
 });

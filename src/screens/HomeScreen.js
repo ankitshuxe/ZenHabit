@@ -1,32 +1,98 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Platform, StatusBar as RNStatusBar, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHabitStore } from '../store/useHabitStore';
-import WeeklyCalendar from '../components/WeeklyCalendar';
 import HabitCard from '../components/HabitCard';
+import BottomSheet from '../components/BottomSheet';
+import Button from '../components/Button';
+import { Heading, Subheading, Title, Body, Caption } from '../components/Typography';
+import { Trash2, Flame, Pencil } from 'lucide-react-native';
 import { format } from 'date-fns';
-import AddHabitModal from '../components/AddHabitModal';
 
-export default function HomeScreen({ theme, colorScheme }) {
+export default function HomeScreen({ theme }) {
+  const insets = useSafeAreaInsets();
+  const userName = useHabitStore((state) => state.userName);
   const habits = useHabitStore((state) => state.habits);
   const toggleCompletion = useHabitStore((state) => state.toggleCompletion);
+  const deleteHabit = useHabitStore((state) => state.deleteHabit);
+  const setUserName = useHabitStore((state) => state.setUserName);
+  const openHabitModal = useHabitStore((state) => state.openHabitModal);
   
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedHabitId, setSelectedHabitId] = useState(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  
+  const dateStr = format(new Date(), 'yyyy-MM-dd');
+  const displayDate = format(new Date(), 'EEEE, MMM d').toUpperCase();
 
-  const dateStr = format(selectedDate, 'yyyy-MM-dd');
+  const handleDelete = () => {
+    if (selectedHabitId) {
+      deleteHabit(selectedHabitId);
+      setSelectedHabitId(null);
+    }
+  };
+
+  const handleEdit = () => {
+    if (selectedHabitId) {
+      openHabitModal(selectedHabitId);
+      setSelectedHabitId(null);
+    }
+  };
+
+  const handleToggle = React.useCallback((id) => {
+    toggleCompletion(id, dateStr);
+  }, [dateStr, toggleCompletion]);
+
+  const handleLongPress = React.useCallback((id) => {
+    setSelectedHabitId(id);
+  }, []);
+
+  const completedToday = habits.filter(h => (h.completions[dateStr] || 0) > 0).length;
+  const totalStreak = habits.reduce((acc, h) => acc + (h.currentStreak || 0), 0);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Habito</Text>
+        <View style={styles.titleRow}>
+          <Heading color={theme.text} style={{ marginBottom: -4 }}>Morning,</Heading>
+          {isEditingName ? (
+            <TextInput
+              style={[styles.nameInput, { color: theme.text, borderBottomColor: theme.border, fontSize: 28, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', fontStyle: 'italic' }]}
+              value={userName}
+              onChangeText={setUserName}
+              autoFocus
+              onBlur={() => {
+                if (!userName || !userName.trim()) setUserName('Guest');
+                setIsEditingName(false);
+              }}
+              onSubmitEditing={() => {
+                if (!userName || !userName.trim()) setUserName('Guest');
+                setIsEditingName(false);
+              }}
+              returnKeyType="done"
+            />
+          ) : (
+            <TouchableOpacity style={styles.nameWrap} onPress={() => setIsEditingName(true)}>
+              <Subheading color={theme.text}>{userName}.</Subheading>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={[styles.growthChip, { backgroundColor: theme.card }]}>
+          <Caption color={theme.textSecondary} style={{ marginBottom: 12 }}>TOTAL STREAK • FIRE</Caption>
+          <View style={styles.streakBadge}>
+            <Heading color={theme.primaryText} style={{ fontSize: 56, letterSpacing: -2 }}>{totalStreak}</Heading>
+            <Flame color={theme.accent || theme.danger} size={36} fill={theme.accent || theme.danger} strokeWidth={0} />
+          </View>
+        </View>
       </View>
       
-      <WeeklyCalendar 
-        selectedDate={selectedDate} 
-        onSelectDate={setSelectedDate} 
-        theme={theme} 
-      />
+      <View style={styles.listHeader}>
+        <Title color={theme.text}>Habits</Title>
+        {habits.length > 0 && (
+          <Body color={theme.textSecondary}>
+            {completedToday}/{habits.length}
+          </Body>
+        )}
+      </View>
 
       <FlatList
         data={habits}
@@ -37,24 +103,45 @@ export default function HomeScreen({ theme, colorScheme }) {
             habit={item} 
             theme={theme} 
             dateStr={dateStr}
-            onToggle={() => toggleCompletion(item.id, dateStr)}
+            onToggle={handleToggle}
+            onLongPress={handleLongPress}
           />
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Title color={theme.text} style={{ marginBottom: 12 }}>Blank Slate</Title>
+            <Body color={theme.textSecondary} style={{ textAlign: 'center' }}>
+              No habits defined yet. Start small.
+            </Body>
+          </View>
+        }
       />
 
-      <TouchableOpacity 
-        style={[styles.fab, { backgroundColor: theme.fab }]}
-        onPress={() => setModalVisible(true)}
+      <BottomSheet 
+        visible={!!selectedHabitId} 
+        onClose={() => setSelectedHabitId(null)} 
+        theme={theme}
       >
-        <Plus color={theme.fabIcon} size={28} />
-      </TouchableOpacity>
-
-      <AddHabitModal 
-        visible={isModalVisible} 
-        onClose={() => setModalVisible(false)} 
-        theme={theme} 
-      />
-    </SafeAreaView>
+        <Title color={theme.text} style={{ marginBottom: 20 }}>Habit Options</Title>
+        
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <Button 
+            title="Edit" 
+            onPress={handleEdit} 
+            theme={theme} 
+            variant="outline" 
+            style={{ flex: 1 }}
+          />
+          <Button 
+            title="Delete" 
+            onPress={handleDelete} 
+            theme={theme} 
+            variant="danger" 
+            style={{ flex: 1 }}
+          />
+        </View>
+      </BottomSheet>
+    </View>
   );
 }
 
@@ -63,31 +150,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+  titleRow: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: 32,
+  },
+  nameInput: {
+    borderBottomWidth: 1,
+    padding: 0,
+    minWidth: 150,
+  },
+  nameWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  growthChip: {
+    paddingVertical: 24,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    width: '100%',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 16,
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
+  emptyState: {
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    justifyContent: 'center',
+    padding: 40,
+    marginTop: 40,
   }
 });

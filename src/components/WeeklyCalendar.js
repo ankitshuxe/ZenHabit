@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { startOfWeek, addDays, format, isSameDay } from 'date-fns';
+import { Caption, Title } from './Typography';
 
 export default function WeeklyCalendar({ selectedDate, onSelectDate, theme }) {
   const weekDays = useMemo(() => {
@@ -16,24 +17,22 @@ export default function WeeklyCalendar({ selectedDate, onSelectDate, theme }) {
           return (
             <TouchableOpacity 
               key={day.toISOString()} 
-              style={[
-                styles.dayContainer, 
-                isSelected && [styles.selectedDay, { backgroundColor: theme.primary }]
-              ]}
+              style={styles.dayContainer}
               onPress={() => onSelectDate(day)}
             >
-              <Text style={[
+              <Caption style={[
                 styles.dayName, 
-                { color: isSelected ? '#FFFFFF' : theme.textSecondary }
+                { color: isSelected ? theme.primary : theme.textSecondary }
               ]}>
                 {format(day, 'EEE')}
-              </Text>
-              <Text style={[
+              </Caption>
+              <Title style={[
                 styles.dayNumber, 
-                { color: isSelected ? '#FFFFFF' : theme.text }
+                { color: isSelected ? (theme.accent || theme.danger) : theme.textSecondary },
+                isSelected && { fontSize: 22, fontWeight: '900' }
               ]}>
                 {format(day, 'd')}
-              </Text>
+              </Title>
             </TouchableOpacity>
           );
         })}
@@ -45,7 +44,7 @@ export default function WeeklyCalendar({ selectedDate, onSelectDate, theme }) {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 15,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     marginBottom: 15,
   },
   scrollContent: {
@@ -59,22 +58,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 45,
     height: 60,
-    borderRadius: 12,
-  },
-  selectedDay: {
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
   dayName: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   dayNumber: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   }
 });

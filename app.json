@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "Habito",
-    "slug": "Habito",
+    "name": "ZenHabit",
+    "slug": "ZenHabit",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "zenhabit",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -16,10 +17,14 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.ankitxdesigns.Habito"
+      "package": "com.ankitshuxe.zenhabit"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
+    ]
   }
 }

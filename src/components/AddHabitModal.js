@@ -1,168 +1,179 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Text } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useHabitStore } from '../store/useHabitStore';
-import { X } from 'lucide-react-native';
+import BottomSheet from './BottomSheet';
+import Button from './Button';
+import SegmentedControl from './SegmentedControl';
+import TagSelector from './TagSelector';
+import IconSelector from './IconSelector';
+import Toggle from './Toggle';
+import { Title, Body, Caption } from './Typography';
+import { format } from 'date-fns';
 
-export default function AddHabitModal({ visible, onClose, theme }) {
+export default function AddHabitModal({ visible, onClose, theme, habitId }) {
   const addHabit = useHabitStore((state) => state.addHabit);
+  const updateHabit = useHabitStore((state) => state.updateHabit);
+  const habits = useHabitStore((state) => state.habits);
+  
+  const [goalType, setGoalType] = useState('Build habit');
   const [name, setName] = useState('');
-  const [type, setType] = useState('checkoff'); // 'checkoff' or 'target'
-  const [target, setTarget] = useState('1');
-  const [unit, setUnit] = useState('');
+  const [icon, setIcon] = useState('Activity');
+  const [tags, setTags] = useState([]);
+  const [everyDay, setEveryDay] = useState(true);
+  const [startDate, setStartDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Initialize or reset form when modal visibility or habitId changes
+  useEffect(() => {
+    if (visible) {
+      if (habitId) {
+        const habitToEdit = habits.find(h => h.id === habitId);
+        if (habitToEdit) {
+          setName(habitToEdit.name);
+          setGoalType(habitToEdit.goalType === 'break' ? 'Break habit' : 'Build habit');
+          setIcon(habitToEdit.icon);
+          setTags(habitToEdit.tags || []);
+          setStartDate(new Date(habitToEdit.startDate || Date.now()));
+        }
+      } else {
+        setName('');
+        setGoalType('Build habit');
+        setIcon('Activity');
+        setTags([]);
+        setStartDate(new Date());
+      }
+    }
+  }, [visible, habitId]);
+
+  useEffect(() => {
+    // Only auto-switch icon if we are NOT editing, to avoid overwriting their saved icon
+    if (!habitId) {
+      setIcon(goalType === 'Break habit' ? 'Wine' : 'Activity');
+    }
+  }, [goalType]);
+
+  const handleToggleTag = (tag) => {
+    if (tags.includes(tag)) setTags(tags.filter(t => t !== tag));
+    else setTags([...tags, tag]);
+  };
 
   const handleSave = () => {
     if (!name.trim()) return;
 
-    addHabit({
+    const payload = {
       name,
-      type,
-      icon: 'Star', // Default icon for now
-      color: '#8b5cf6', // Purple default
-      target: type === 'target' ? parseInt(target, 10) || 1 : null,
-      unit: type === 'target' ? unit : null,
-    });
+      goalType: goalType === 'Build habit' ? 'build' : 'break',
+      icon, 
+      tags,
+      startDate: startDate.toISOString(),
+    };
+
+    if (habitId) {
+      updateHabit(habitId, payload);
+    } else {
+      addHabit(payload);
+    }
     
-    setName('');
-    setType('checkoff');
-    setTarget('1');
-    setUnit('');
     onClose();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-        style={styles.modalOverlay}
-      >
-        <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>New Habit</Text>
-            <TouchableOpacity onPress={onClose}>
-              <X color={theme.textSecondary} size={24} />
-            </TouchableOpacity>
-          </View>
+    <BottomSheet visible={visible} onClose={onClose} theme={theme}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+        <SegmentedControl 
+          options={['Build habit', 'Break habit']} 
+          selected={goalType} 
+          onSelect={setGoalType} 
+          theme={theme} 
+        />
 
-          <TextInput
-            style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-            placeholder="Habit Name"
-            placeholderTextColor={theme.textSecondary}
-            value={name}
-            onChangeText={setName}
+        <Caption style={[styles.label, { color: theme.textSecondary }]}>Name</Caption>
+        <TextInput
+          style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+          placeholder={goalType === 'Break habit' ? "Smoking, junk food, etc." : "Read for 30m, code, etc."}
+          placeholderTextColor={theme.textSecondary}
+          value={name}
+          onChangeText={setName}
+        />
+
+        {goalType === 'Break habit' && (
+          <Body style={{ fontSize: 12, color: theme.danger, marginTop: 8 }}>
+            Break habits are marked in red. The goal is to avoid doing them.
+          </Body>
+        )}
+        
+        <IconSelector selectedIcon={icon} onSelectIcon={setIcon} theme={theme} isBreak={goalType === 'Break habit'} />
+
+        <Caption style={[styles.label, { color: theme.textSecondary }]}>Start date</Caption>
+        <TouchableOpacity style={[styles.input, { borderColor: theme.border, justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>
+          <Body style={{ color: theme.text, fontSize: 16 }}>
+            {format(startDate, 'MMMM d, yyyy')}
+          </Body>
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(Platform.OS === 'ios');
+              if (selectedDate) {
+                setStartDate(selectedDate);
+              }
+            }}
           />
+        )}
 
-          <View style={styles.typeSelector}>
-            <TouchableOpacity 
-              style={[
-                styles.typeBtn, 
-                { borderColor: theme.border },
-                type === 'checkoff' && { backgroundColor: theme.primary, borderColor: theme.primary }
-              ]}
-              onPress={() => setType('checkoff')}
-            >
-              <Text style={{ color: type === 'checkoff' ? '#fff' : theme.text }}>Check-off</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[
-                styles.typeBtn, 
-                { borderColor: theme.border, marginLeft: 10 },
-                type === 'target' && { backgroundColor: theme.primary, borderColor: theme.primary }
-              ]}
-              onPress={() => setType('target')}
-            >
-              <Text style={{ color: type === 'target' ? '#fff' : theme.text }}>Target</Text>
-            </TouchableOpacity>
-          </View>
-
-          {type === 'target' && (
-            <View style={styles.targetRow}>
-              <TextInput
-                style={[styles.input, styles.targetInput, { color: theme.text, borderColor: theme.border }]}
-                placeholder="Target (e.g. 3)"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="numeric"
-                value={target}
-                onChangeText={setTarget}
-              />
-              <TextInput
-                style={[styles.input, styles.unitInput, { color: theme.text, borderColor: theme.border }]}
-                placeholder="Unit (e.g. litres)"
-                placeholderTextColor={theme.textSecondary}
-                value={unit}
-                onChangeText={setUnit}
-              />
-            </View>
-          )}
-
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>Save Habit</Text>
-          </TouchableOpacity>
+        <View style={styles.row}>
+          <Caption style={{ color: theme.textSecondary }}>Every day</Caption>
+          <Toggle value={everyDay} onValueChange={setEveryDay} theme={theme} />
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <TagSelector selectedTags={tags} onToggleTag={handleToggleTag} theme={theme} />
+
+        <View style={styles.footer}>
+          <Button 
+            title="Cancel" 
+            onPress={onClose} 
+            theme={theme} 
+            variant="outline" 
+            style={{ flex: 1 }}
+          />
+          <Button 
+            title={habitId ? "Save" : "Add"} 
+            onPress={handleSave} 
+            theme={theme} 
+            variant="primary" 
+            style={{ flex: 1 }}
+          />
+        </View>
+      </ScrollView>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  label: { marginBottom: 8, marginTop: 16 },
+  input: {
+    borderBottomWidth: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '800', // Making input bolder to match aesthetic
+    height: 50,
   },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    minHeight: 400,
-  },
-  header: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: 16
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  typeSelector: {
+  footer: {
     flexDirection: 'row',
-    marginBottom: 16,
-  },
-  typeBtn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  targetRow: {
-    flexDirection: 'row',
-  },
-  targetInput: {
-    flex: 1,
-    marginRight: 10,
-  },
-  unitInput: {
-    flex: 2,
-  },
-  saveBtn: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginTop: 20,
+    marginBottom: 40
   }
 });
