@@ -48,6 +48,8 @@ CREATE TABLE public.habits (
   goal_type TEXT NOT NULL, -- 'build' or 'break'
   icon TEXT NOT NULL,
   tags TEXT[] DEFAULT '{}',
+  frequency JSONB DEFAULT '{"type": "daily"}',
+  reminder_time TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -100,3 +102,15 @@ CREATE POLICY "Users can delete own completions."
 -- Setup Realtime
 alter publication supabase_realtime add table public.habits;
 alter publication supabase_realtime add table public.habit_completions;
+
+-- 4. RPC for Account Deletion
+CREATE OR REPLACE FUNCTION delete_user_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Delete the user from auth.users (which cascades to profiles, habits, etc.)
+  DELETE FROM auth.users WHERE id = auth.uid();
+END;
+$$;

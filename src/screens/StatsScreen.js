@@ -25,7 +25,7 @@ export default function StatsScreen({ theme }) {
           <View style={[styles.growthChip, { backgroundColor: theme.card }]}>
             <Caption color={theme.textSecondary} style={{ marginBottom: 12 }}>BEST STREAK</Caption>
             <View style={styles.streakBadge}>
-              <Heading color={theme.primaryText} style={{ fontSize: 36, letterSpacing: -1 }}>{bestStreak}</Heading>
+              <Heading color="#F3EFE9" style={{ fontSize: 36, letterSpacing: -1 }}>{bestStreak}</Heading>
               <Flame color={theme.tags?.Patience || theme.danger} size={28} fill={theme.tags?.Patience || theme.danger} strokeWidth={0} />
             </View>
           </View>
@@ -33,7 +33,7 @@ export default function StatsScreen({ theme }) {
           <View style={[styles.growthChip, { backgroundColor: theme.card }]}>
             <Caption color={theme.textSecondary} style={{ marginBottom: 12 }}>TOTAL DONE</Caption>
             <View style={styles.streakBadge}>
-              <Heading color={theme.primaryText} style={{ fontSize: 36, letterSpacing: -1 }}>{totalCompletions}</Heading>
+              <Heading color="#F3EFE9" style={{ fontSize: 36, letterSpacing: -1 }}>{totalCompletions}</Heading>
               <Star color={theme.tags?.Consistency || theme.primary} size={28} fill={theme.tags?.Consistency || theme.primary} strokeWidth={0} />
             </View>
           </View>

@@ -3,22 +3,47 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, StatusBar as 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHabitStore } from '../store/useHabitStore';
 import { Heading, Title, Body, Caption } from '../components/Typography';
+import { supabase } from '../lib/supabase';
+import { User, Cloud, CloudOff } from 'lucide-react-native';
 
 export default function SettingsScreen({ theme }) {
   const insets = useSafeAreaInsets();
   const clearAllData = useHabitStore((state) => state.clearAllData);
+  const deleteUserAccount = useHabitStore((state) => state.deleteUserAccount);
+  const isLoggedIn = useHabitStore((state) => state.isLoggedIn);
+  const userName = useHabitStore((state) => state.userName);
   const themePreference = useHabitStore((state) => state.themePreference);
   const setThemePreference = useHabitStore((state) => state.setThemePreference);
   const setLoggedIn = useHabitStore((state) => state.setLoggedIn);
+  const logout = useHabitStore((state) => state.logout);
   const showPopup = useHabitStore((state) => state.showPopup);
+
+  const isRealUser = isLoggedIn && userName !== 'Guest';
+  
+  const [email, setEmail] = React.useState('');
+  const [isSyncing, setIsSyncing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isRealUser) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) setEmail(user.email);
+      });
+      
+      const interval = setInterval(() => {
+        setIsSyncing(true);
+        setTimeout(() => setIsSyncing(false), 1500);
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [isRealUser]);
 
   const handleDeleteData = () => {
     showPopup(
-      "Delete All Data",
-      "Are you sure you want to erase all your habits and history? This cannot be undone.",
+      isRealUser ? "Delete Account" : "Delete All Data",
+      isRealUser ? "Are you sure you want to delete your account and all history? This cannot be undone." : "Are you sure you want to erase all your habits and history? This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: clearAllData }
+        { text: "Delete", style: "destructive", onPress: isRealUser ? deleteUserAccount : clearAllData }
       ]
     );
   };
@@ -31,6 +56,26 @@ export default function SettingsScreen({ theme }) {
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 20) }]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Heading color={theme.text} style={{ marginBottom: 24, marginTop: 10 }}>Settings</Heading>
+
+        <Title color={theme.text} style={{ marginBottom: 12 }}>Profile</Title>
+        <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.card, borderWidth: 1 }]}>
+          <View style={styles.textWrap}>
+            <Title color="#F3EFE9" style={{ fontSize: 18, marginBottom: 4 }}>{userName ? userName.trim().split(' ')[0] : 'User'}</Title>
+            <Body color="#F3EFE9" style={{ opacity: 0.8 }}>{isRealUser ? email : 'Local Guest Account'}</Body>
+          </View>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            {!isRealUser ? (
+              <CloudOff size={24} color="#F3EFE9" opacity={0.6} />
+            ) : isSyncing ? (
+              <Cloud size={24} color="#F3EFE9" />
+            ) : (
+              <Cloud size={24} color={theme.accent} />
+            )}
+            <Caption style={{ color: !isRealUser ? '#F3EFE9' : (isSyncing ? '#F3EFE9' : theme.accent), opacity: !isRealUser ? 0.6 : 1, marginTop: 4, fontWeight: 'bold' }}>
+              {!isRealUser ? 'Not Synced' : (isSyncing ? 'Syncing...' : 'Synced')}
+            </Caption>
+          </View>
+        </View>
 
         <Title color={theme.text} style={{ marginBottom: 12 }}>Appearance</Title>
         <View style={[styles.row, { borderBottomColor: theme.border, borderBottomWidth: 1, flexDirection: 'column', alignItems: 'stretch' }]}>
@@ -70,8 +115,12 @@ export default function SettingsScreen({ theme }) {
         </TouchableOpacity>
         <TouchableOpacity style={[styles.row, { borderBottomColor: theme.border, borderBottomWidth: 1 }]} onPress={handleDeleteData}>
           <View style={styles.textWrap}>
-            <Title color={theme.danger} style={{ fontSize: 16, marginBottom: 4 }}>Delete All Data</Title>
-            <Body color={theme.textSecondary}>Erase all from device.</Body>
+            <Title color={theme.danger} style={{ fontSize: 16, marginBottom: 4 }}>
+              {isRealUser ? "Delete Account & Data" : "Delete All Data"}
+            </Title>
+            <Body color={theme.textSecondary}>
+              {isRealUser ? "Erase account and device data." : "Erase all from device."}
+            </Body>
           </View>
         </TouchableOpacity>
 
@@ -84,7 +133,7 @@ export default function SettingsScreen({ theme }) {
               "Are you sure you want to log out of your account?",
               [
                 { text: "Cancel", style: "cancel" },
-                { text: "Log Out", style: "destructive", onPress: () => setLoggedIn(false) }
+                { text: "Log Out", style: "destructive", onPress: logout }
               ]
             );
           }}
@@ -110,5 +159,19 @@ const styles = StyleSheet.create({
   segmentContainer: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, overflow: 'hidden' },
   segmentButton: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1 },
   segmentText: { fontSize: 14, fontWeight: '700' },
+  profileCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
 });
 

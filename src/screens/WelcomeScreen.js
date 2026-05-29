@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, Dimensions, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, Dimensions, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import { Heading, Caption, Body } from '../components/Typography';
 
@@ -8,18 +9,18 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDES = [
   {
     subtitle: "AWARENESS",
-    title: "Track your habits without the pressure",
-    description: "Build a life you love, one tiny step at a time. No streaks to lose, no guilt. Just progress."
+    title: "Track without pressure",
+    description: "Build a life you love, one step at a time. No guilt, just progress.",
   },
   {
     subtitle: "CLARITY",
-    title: "A clutter-free space for your mind",
-    description: "Designed like a premium editorial magazine. Because your goals deserve a beautiful home."
+    title: "Space for your mind",
+    description: "Designed beautifully. Because your goals deserve a premium home.",
   },
   {
     subtitle: "ACTION",
     title: "Small steps, big change",
-    description: "Ready to take control? Start tracking the things that truly matter to you today."
+    description: "Ready to take control? Start tracking the things that truly matter to you today.",
   }
 ];
 
@@ -52,19 +53,23 @@ export default function WelcomeScreen({ theme, onStart }) {
         scrollEventThrottle={16}
         style={styles.scrollView}
       >
-        {SLIDES.map((slide, index) => (
-          <View key={index} style={[styles.slide, { width: SCREEN_WIDTH }]}>
-            <View style={styles.spacer} />
-            <View style={styles.textContainer}>
-              <Caption color={theme.accent} style={styles.subtitle}>{slide.subtitle}</Caption>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <Heading color={theme.text} style={styles.title}>{slide.title}</Heading>
-                <Heading color={theme.accent} style={styles.title}>.</Heading>
+        {SLIDES.map((slide, index) => {
+          return (
+            <View key={index} style={[styles.slide, { width: SCREEN_WIDTH }]}>
+              <View style={styles.imageContainer}>
+                {/* Place your illustrations here */}
               </View>
+              <View style={styles.textContainer}>
+                <Caption color={theme.accent} style={styles.subtitle}>{slide.subtitle}</Caption>
+              <Heading color={theme.text} style={styles.title}>
+                {slide.title}
+                <Heading color={theme.accent} style={styles.title}>.</Heading>
+              </Heading>
               <Body color={theme.textSecondary} style={styles.description}>{slide.description}</Body>
             </View>
           </View>
-        ))}
+          );
+        })}
       </Animated.ScrollView>
 
       <View style={styles.footer}>
@@ -116,10 +121,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
   slide: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 30, paddingBottom: 60 },
-  spacer: { flex: 1 },
-  textContainer: { gap: 16 },
+  imageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  textContainer: { gap: 16, height: 210 },
   subtitle: { marginBottom: 4, letterSpacing: 2 },
-  title: { fontSize: 44, lineHeight: 48 },
+  title: { fontSize: 44, lineHeight: 54 },
   description: { fontSize: 18, lineHeight: 26, marginTop: 8 },
   footer: { paddingHorizontal: 24, paddingBottom: 40 },
   pagination: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 32 },

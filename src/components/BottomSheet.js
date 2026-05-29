@@ -71,11 +71,27 @@ export default function BottomSheet({ visible, onClose, children, theme }) {
         
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.overlay, { zIndex: 2 }]} pointerEvents="box-none">
           <Animated.View 
-            style={[styles.sheet, { backgroundColor: theme.background, transform: [{ translateY }] }]}
+            style={[
+              styles.sheet, 
+              { 
+                backgroundColor: theme.background,
+                borderTopColor: theme.background === '#111111' ? theme.border : theme.textSecondary,
+                borderTopWidth: 1,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
+                borderColor: theme.background === '#111111' ? theme.border : theme.textSecondary,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -10 },
+                shadowOpacity: 0.15,
+                shadowRadius: 20,
+                elevation: 24,
+                transform: [{ translateY }] 
+              }
+            ]}
             {...panResponder.panHandlers}
           >
             <View style={styles.handleContainer}>
-              <View style={[styles.handle, { backgroundColor: theme.border }]} />
+              <View style={[styles.handle, { backgroundColor: theme.textSecondary, opacity: 0.4 }]} />
             </View>
             {children}
           </Animated.View>
@@ -88,7 +104,7 @@ export default function BottomSheet({ visible, onClose, children, theme }) {
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject },
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 24, paddingBottom: 40, maxHeight: '95%' },
+  sheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingBottom: 40, maxHeight: '95%' },
   handleContainer: { alignItems: 'center', paddingTop: 16, paddingBottom: 24, width: '100%' },
   handle: { width: 40, height: 4, borderRadius: 2 }
 });

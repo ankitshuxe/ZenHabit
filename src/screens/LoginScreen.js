@@ -9,8 +9,13 @@ import { Mail, User } from 'lucide-react-native';
 import { GoogleIcon, AppleIcon } from '../components/SocialIcons';
 import { Heading, Title, Body, Caption } from '../components/Typography';
 import { supabase, isConfigured } from '../lib/supabase';
+import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
 
 WebBrowser.maybeCompleteAuthSession();
+
+GoogleSignin.configure({
+  webClientId: '100342460316-rdv228qkjeon4nkgca04c9tuj1bd730c.apps.googleusercontent.com',
+});
 
 export default function LoginScreen({ theme }) {
   const setLoggedIn = useHabitStore((state) => state.setLoggedIn);
@@ -26,6 +31,38 @@ export default function LoginScreen({ theme }) {
   const handleGuestAuth = () => {
     setUserName('Guest');
     setLoggedIn(true);
+  };
+
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      
+      if (isSuccessResponse(response)) {
+        const { idToken } = response.data;
+        if (idToken) {
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: idToken,
+          });
+          if (error) throw error;
+          
+          setUserName(data?.user?.user_metadata?.full_name || 'User');
+          setLoggedIn(true);
+        }
+      }
+    } catch (error) {
+      if (isErrorWithCode(error)) {
+        if (error.code !== statusCodes.SIGN_IN_CANCELLED && error.code !== statusCodes.IN_PROGRESS) {
+           showPopup('Google Auth Error', error.message);
+        }
+      } else {
+        showPopup('Google Auth Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOAuth = async (provider) => {
@@ -139,7 +176,7 @@ export default function LoginScreen({ theme }) {
       <View style={{ flexDirection: 'row', gap: 16 }}>
         <Button 
           title="Google" 
-          onPress={() => handleOAuth('google')} 
+          onPress={handleGoogleAuth} 
           theme={theme} 
           variant="card" 
           icon={<GoogleIcon color={theme.text} size={20} />} 
@@ -231,7 +268,7 @@ export default function LoginScreen({ theme }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: 24 },
+  content: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 24, paddingBottom: 60 },
   title: { fontSize: 40, marginBottom: 8 },
   subtitle: { marginBottom: 32 },
   sheetTitle: { marginBottom: 8 },

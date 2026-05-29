@@ -4,6 +4,34 @@ import { createMMKV } from 'react-native-mmkv';
 import { format } from 'date-fns';
 import { NativeModules } from 'react-native';
 import { supabase } from '../lib/supabase';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+const scheduleHabitNotifications = async (habits) => {
+  if (Platform.OS === 'web') return;
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    for (const habit of habits) {
+      if (habit.reminderTime) {
+        const d = new Date(habit.reminderTime);
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'ZenHabit Reminder',
+            body: `Time for your habit: ${habit.name}`,
+          },
+          trigger: {
+            type: 'daily',
+            hour: d.getHours(),
+            minute: d.getMinutes(),
+          },
+        });
+      }
+    }
+  } catch (error) {
+    console.log('Failed to schedule notifications', error);
+  }
+};
 
 const storage = createMMKV();
 let syncTimeout = null;
@@ -73,6 +101,8 @@ const initialHabits = [
     goalType: 'build',
     icon: 'GlassWater',
     tags: ['Consistency'],
+    frequency: { type: 'daily' },
+    reminderTime: null,
     completions: {},
     currentStreak: 0,
     bestStreak: 0,
@@ -85,6 +115,8 @@ const initialHabits = [
     goalType: 'build',
     icon: 'Code',
     tags: ['Discipline', 'Consistency', 'Awareness'],
+    frequency: { type: 'daily' },
+    reminderTime: null,
     completions: {},
     currentStreak: 0,
     bestStreak: 0,
@@ -97,6 +129,8 @@ const initialHabits = [
     goalType: 'break',
     icon: 'Pizza',
     tags: ['Self-control', 'Awareness'],
+    frequency: { type: 'daily' },
+    reminderTime: null,
     completions: {},
     currentStreak: 0,
     bestStreak: 0,
@@ -125,12 +159,17 @@ export const useHabitStore = create(
       setLoggedIn: (status) => set({ isLoggedIn: status }),
       setThemePreference: (pref) => set({ themePreference: pref }),
       
-      setUserName: (name) => set({ userName: name }),
+      setUserName: (name) => {
+        const firstName = name ? name.trim().split(' ')[0] : 'User';
+        set({ userName: firstName });
+      },
       
       addHabit: async (habit) => {
         const newHabit = { 
           ...habit, 
           id: `habit-${Date.now()}`, 
+          frequency: habit.frequency || { type: 'daily' },
+          reminderTime: habit.reminderTime || null,
           completions: {}, 
           currentStreak: 0, 
           bestStreak: 0, 
@@ -138,7 +177,11 @@ export const useHabitStore = create(
           createdAt: new Date().toISOString() 
         };
         // Optimistic UI Update
-        set((state) => ({ habits: [...state.habits, newHabit] }));
+        set((state) => {
+          const newHabits = [...state.habits, newHabit];
+          scheduleHabitNotifications(newHabits);
+          return { habits: newHabits };
+        });
         get().syncToWidget();
         
         // Background Cloud Sync
@@ -152,6 +195,8 @@ export const useHabitStore = create(
               goal_type: newHabit.goalType,
               icon: newHabit.icon,
               tags: newHabit.tags,
+              frequency: newHabit.frequency,
+              reminder_time: newHabit.reminderTime,
               created_at: newHabit.createdAt
             });
           }
@@ -159,7 +204,11 @@ export const useHabitStore = create(
       },
       
       updateHabit: async (id, updates) => {
-        set((state) => ({ habits: state.habits.map(h => h.id === id ? { ...h, ...updates } : h) }));
+        set((state) => {
+          const newHabits = state.habits.map(h => h.id === id ? { ...h, ...updates } : h);
+          scheduleHabitNotifications(newHabits);
+          return { habits: newHabits };
+        });
         get().syncToWidget();
 
         // Background Cloud Sync
@@ -172,14 +221,20 @@ export const useHabitStore = create(
               name: updates.name,
               goal_type: updates.goalType,
               icon: updates.icon,
-              tags: updates.tags
+              tags: updates.tags,
+              frequency: updates.frequency !== undefined ? updates.frequency : get().habits.find(h => h.id === id)?.frequency,
+              reminder_time: updates.reminderTime !== undefined ? updates.reminderTime : get().habits.find(h => h.id === id)?.reminderTime
             });
           }
         }
       },
       
       deleteHabit: async (id) => {
-        set((state) => ({ habits: state.habits.filter(h => h.id !== id) }));
+        set((state) => {
+          const newHabits = state.habits.filter(h => h.id !== id);
+          scheduleHabitNotifications(newHabits);
+          return { habits: newHabits };
+        });
         get().syncToWidget();
 
         // Background Cloud Sync
@@ -191,6 +246,39 @@ export const useHabitStore = create(
       clearAllData: () => {
         set({ habits: [] });
         get().syncToWidget();
+      },
+      
+      deleteUserAccount: async () => {
+        try {
+          if (get().isLoggedIn && get().userName !== 'Guest') {
+            await supabase.rpc('delete_user_account');
+            await supabase.auth.signOut();
+          }
+          try {
+            await GoogleSignin.signOut();
+          } catch (e) {}
+        } catch (error) {
+          console.error('Failed to delete user account:', error);
+        } finally {
+          get().clearAllData();
+          set({ isLoggedIn: false, userName: 'User', hasSeenOnboarding: false });
+        }
+      },
+      
+      logout: async () => {
+        try {
+          if (get().isLoggedIn && get().userName !== 'Guest') {
+            await supabase.auth.signOut();
+          }
+          try {
+            await GoogleSignin.signOut();
+          } catch (e) {}
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          get().clearAllData();
+          set({ isLoggedIn: false, userName: 'User', hasSeenOnboarding: false });
+        }
       },
       
       toggleCompletion: async (id, dateStr) => {
@@ -274,6 +362,8 @@ export const useHabitStore = create(
               goalType: h.goal_type,
               icon: h.icon,
               tags: h.tags,
+              frequency: h.frequency || { type: 'daily' },
+              reminderTime: h.reminder_time,
               createdAt: h.created_at,
               completions,
               ...stats
@@ -282,6 +372,7 @@ export const useHabitStore = create(
 
           // Replace local habits with cloud source of truth
           set({ habits: cloudHabits });
+          scheduleHabitNotifications(cloudHabits);
           get().syncToWidget();
         } catch (error) {
           console.error('Failed to fetch cloud data:', error);
@@ -306,8 +397,6 @@ export const useHabitStore = create(
             
             if (NativeModules.WidgetBridge) {
               NativeModules.WidgetBridge.setWidgetData(JSON.stringify(habitsData));
-            } else {
-              console.warn('WidgetBridge native module is not available yet.');
             }
           } catch (error) {
             console.log('Widget sync failed:', error);

@@ -46,18 +46,28 @@ export default function HomeScreen({ theme }) {
     setSelectedHabitId(id);
   }, []);
 
-  const completedToday = habits.filter(h => (h.completions[dateStr] || 0) > 0).length;
+  const currentDayIndex = new Date().getDay();
+
+  const todaysHabits = habits.filter(h => {
+    if (!h.frequency || h.frequency.type === 'daily') return true;
+    if (h.frequency.type === 'weekly' && h.frequency.days) {
+      return h.frequency.days.includes(currentDayIndex);
+    }
+    return true;
+  });
+
+  const completedToday = todaysHabits.filter(h => (h.completions[dateStr] || 0) > 0).length;
   const totalStreak = habits.reduce((acc, h) => acc + (h.currentStreak || 0), 0);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Heading color={theme.text} style={{ marginBottom: -4 }}>Morning,</Heading>
+          <Heading color={theme.text} style={{ marginRight: 8 }}>Morning,</Heading>
           {isEditingName ? (
             <TextInput
-              style={[styles.nameInput, { color: theme.text, borderBottomColor: theme.border, fontSize: 28, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', fontStyle: 'italic' }]}
-              value={userName}
+              style={[styles.nameInput, { color: theme.text, borderBottomColor: theme.border, fontSize: 28, fontWeight: '900', letterSpacing: -1 }]}
+              value={userName ? userName.trim().split(' ')[0] : 'User'}
               onChangeText={setUserName}
               autoFocus
               onBlur={() => {
@@ -72,14 +82,14 @@ export default function HomeScreen({ theme }) {
             />
           ) : (
             <TouchableOpacity style={styles.nameWrap} onPress={() => setIsEditingName(true)}>
-              <Subheading color={theme.text}>{userName}.</Subheading>
+              <Heading color={theme.text}>{userName ? userName.trim().split(' ')[0] : 'User'}.</Heading>
             </TouchableOpacity>
           )}
         </View>
         <View style={[styles.growthChip, { backgroundColor: theme.card }]}>
           <Caption color={theme.textSecondary} style={{ marginBottom: 12 }}>TOTAL STREAK • FIRE</Caption>
           <View style={styles.streakBadge}>
-            <Heading color={theme.primaryText} style={{ fontSize: 56, letterSpacing: -2 }}>{totalStreak}</Heading>
+            <Heading color="#F3EFE9" style={{ fontSize: 56, letterSpacing: -2 }}>{totalStreak}</Heading>
             <Flame color={theme.accent || theme.danger} size={36} fill={theme.accent || theme.danger} strokeWidth={0} />
           </View>
         </View>
@@ -87,15 +97,15 @@ export default function HomeScreen({ theme }) {
       
       <View style={styles.listHeader}>
         <Title color={theme.text}>Habits</Title>
-        {habits.length > 0 && (
+        {todaysHabits.length > 0 && (
           <Body color={theme.textSecondary}>
-            {completedToday}/{habits.length}
+            {completedToday}/{todaysHabits.length}
           </Body>
         )}
       </View>
 
       <FlatList
-        data={habits}
+        data={todaysHabits}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
@@ -109,7 +119,7 @@ export default function HomeScreen({ theme }) {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Title color={theme.text} style={{ marginBottom: 12 }}>Blank Slate</Title>
+            <Title color={theme.text} style={{ marginBottom: 12 }}>Nothing here.</Title>
             <Body color={theme.textSecondary} style={{ textAlign: 'center' }}>
               No habits defined yet. Start small.
             </Body>
@@ -155,9 +165,10 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   titleRow: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 32,
+    flexWrap: 'wrap',
   },
   nameInput: {
     borderBottomWidth: 1,

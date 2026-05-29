@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, DeviceEventEmitter } from 'react-native';
+import { useColorScheme, View, DeviceEventEmitter, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import HomeScreen from './src/screens/HomeScreen';
@@ -15,6 +15,17 @@ import LoginScreen from './src/screens/LoginScreen';
 import { colors } from './src/theme/colors';
 import { useHabitStore } from './src/store/useHabitStore';
 import { supabase } from './src/lib/supabase';
+import * as Notifications from 'expo-notifications';
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 export default function App() {
   const systemColorScheme = useColorScheme();
@@ -58,6 +69,18 @@ export default function App() {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    // Request notification permissions
+    const requestPermissions = async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        await Notifications.requestPermissionsAsync();
+      }
+    };
+    requestPermissions();
   }, []);
 
   useEffect(() => {

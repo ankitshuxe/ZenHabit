@@ -10,6 +10,7 @@ import IconSelector from './IconSelector';
 import Toggle from './Toggle';
 import { Title, Body, Caption } from './Typography';
 import { format } from 'date-fns';
+import * as Notifications from 'expo-notifications';
 
 export default function AddHabitModal({ visible, onClose, theme, habitId }) {
   const addHabit = useHabitStore((state) => state.addHabit);
@@ -21,8 +22,13 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
   const [icon, setIcon] = useState('Activity');
   const [tags, setTags] = useState([]);
   const [everyDay, setEveryDay] = useState(true);
+  const [selectedDays, setSelectedDays] = useState([0, 1, 2, 3, 4, 5, 6]); // 0 = Sunday, 1 = Monday
   const [startDate, setStartDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Initialize or reset form when modal visibility or habitId changes
   useEffect(() => {
@@ -35,6 +41,20 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
           setIcon(habitToEdit.icon);
           setTags(habitToEdit.tags || []);
           setStartDate(new Date(habitToEdit.startDate || Date.now()));
+          
+          if (habitToEdit.frequency && habitToEdit.frequency.type === 'weekly') {
+            setEveryDay(false);
+            setSelectedDays(habitToEdit.frequency.days || []);
+          } else {
+            setEveryDay(true);
+          }
+          
+          if (habitToEdit.reminderTime) {
+            setReminderEnabled(true);
+            setReminderTime(new Date(habitToEdit.reminderTime));
+          } else {
+            setReminderEnabled(false);
+          }
         }
       } else {
         setName('');
@@ -42,6 +62,10 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
         setIcon('Activity');
         setTags([]);
         setStartDate(new Date());
+        setEveryDay(true);
+        setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+        setReminderEnabled(false);
+        setReminderTime(new Date());
       }
     }
   }, [visible, habitId]);
@@ -58,8 +82,28 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
     else setTags([...tags, tag]);
   };
 
-  const handleSave = () => {
+  const handleToggleDay = (dayIndex) => {
+    if (selectedDays.includes(dayIndex)) {
+      if (selectedDays.length > 1) {
+        setSelectedDays(selectedDays.filter(d => d !== dayIndex));
+      }
+    } else {
+      setSelectedDays([...selectedDays, dayIndex].sort());
+    }
+  };
+
+  const handleSave = async () => {
     if (!name.trim()) return;
+    
+    // Request notification permissions if reminder is enabled
+    if (reminderEnabled && Platform.OS !== 'web') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Please enable notifications in settings to receive reminders.');
+        setReminderEnabled(false);
+        return;
+      }
+    }
 
     const payload = {
       name,
@@ -67,6 +111,8 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
       icon, 
       tags,
       startDate: startDate.toISOString(),
+      frequency: everyDay ? { type: 'daily' } : { type: 'weekly', days: selectedDays },
+      reminderTime: reminderEnabled ? reminderTime.toISOString() : null,
     };
 
     if (habitId) {
@@ -117,12 +163,13 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
             value={startDate}
             mode="date"
             display="default"
-            onChange={(event, selectedDate) => {
+            onValueChange={(event, selectedDate) => {
               setShowDatePicker(Platform.OS === 'ios');
               if (selectedDate) {
                 setStartDate(selectedDate);
               }
             }}
+            onDismiss={() => setShowDatePicker(Platform.OS === 'ios')}
           />
         )}
 
@@ -130,6 +177,48 @@ export default function AddHabitModal({ visible, onClose, theme, habitId }) {
           <Caption style={{ color: theme.textSecondary }}>Every day</Caption>
           <Toggle value={everyDay} onValueChange={setEveryDay} theme={theme} />
         </View>
+
+        {!everyDay && (
+          <View style={styles.daysRow}>
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dayChar, i) => (
+              <TouchableOpacity 
+                key={i}
+                style={[styles.dayCircle, selectedDays.includes(i) ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.border }]}
+                onPress={() => handleToggleDay(i)}
+              >
+                <Body style={{ color: selectedDays.includes(i) ? theme.primaryText : theme.textSecondary, fontWeight: 'bold' }}>{dayChar}</Body>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.row}>
+          <Caption style={{ color: theme.textSecondary }}>Daily Reminder</Caption>
+          <Toggle value={reminderEnabled} onValueChange={setReminderEnabled} theme={theme} />
+        </View>
+
+        {reminderEnabled && (
+          <TouchableOpacity style={[styles.input, { borderColor: theme.border, justifyContent: 'center', marginBottom: 16 }]} onPress={() => setShowTimePicker(true)}>
+            <Body style={{ color: theme.text, fontSize: 16 }}>
+              {format(reminderTime, 'h:mm a')}
+            </Body>
+          </TouchableOpacity>
+        )}
+
+        {showTimePicker && (
+          <DateTimePicker
+            value={reminderTime}
+            mode="time"
+            display="default"
+            onValueChange={(event, selectedDate) => {
+              setShowTimePicker(Platform.OS === 'ios');
+              if (selectedDate) {
+                setReminderTime(selectedDate);
+              }
+            }}
+            onDismiss={() => setShowTimePicker(Platform.OS === 'ios')}
+          />
+        )}
 
         <TagSelector selectedTags={tags} onToggleTag={handleToggleTag} theme={theme} />
 
@@ -168,6 +257,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 16
+  },
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  dayCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   footer: {
     flexDirection: 'row',

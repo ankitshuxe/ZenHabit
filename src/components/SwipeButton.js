@@ -68,7 +68,7 @@ export default function SwipeButton({ onComplete, isCompleted, theme, progressTe
           style={[styles.dragButton, { backgroundColor: theme.primary, transform: [{ translateX }] }]}
           {...panResponder.panHandlers}
         >
-          <Text style={styles.dragText}>Drag to {progressText.includes('/') ? 'Progress' : 'Complete'} &gt;&gt;</Text>
+          <Text style={[styles.dragText, { color: theme.primaryText }]}>Drag to {progressText.includes('/') ? 'Progress' : 'Complete'} &gt;&gt;</Text>
         </Animated.View>
       ) : (
         <View style={[styles.dragButton, { backgroundColor: theme.border, width: '100%', alignItems: 'center', position: 'absolute' }]}>
